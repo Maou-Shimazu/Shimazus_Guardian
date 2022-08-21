@@ -1,11 +1,19 @@
 #![allow(unused_imports)]
 use serenity::async_trait;
-use serenity::model::application::command::{Command, CommandOptionType};
-use serenity::model::application::interaction::{
-    application_command::CommandDataOptionValue, Interaction, InteractionResponseType,
-};
+use serenity::model::prelude::Guild;
 use serenity::model::{
-    channel::Message, gateway::Ready, id::ChannelId, id::GuildId, prelude::Member, Timestamp,
+    application::{
+        command::{Command, CommandOptionType},
+        interaction::{
+            application_command::CommandDataOptionValue, Interaction, InteractionResponseType,
+        },
+    },
+    channel::Message,
+    gateway::Ready,
+    id::{ChannelId, GuildId},
+    permissions::Permissions,
+    prelude::{Member, ResumedEvent},
+    Timestamp,
 };
 use serenity::prelude::*;
 use std::env;
@@ -34,8 +42,92 @@ impl EventHandler for Handler {
                     }).await;
                     "Verified!".into()
                 }
+                "mute" => {
+                    let u_user = command
+                        .data
+                        .options
+                        .get(0)
+                        .expect("Expected user option.")
+                        .resolved
+                        .as_ref()
+                        .expect("Expected user option.");
+                    let reason = command
+                        .data
+                        .options
+                        .get(1) // warning: makes it required, fix
+                        .expect("Expected reason")
+                        .resolved
+                        .as_ref()
+                        .expect("Expected reason");
+                    let reason = match reason {
+                        CommandDataOptionValue::String(result) => result,
+                        _ => "No Reason",
+                    };
+                    let r: String;
+                    if let CommandDataOptionValue::User(user, _member) = u_user {
+                        match ctx
+                            .http
+                            .add_member_role(
+                                command.guild_id.unwrap().0,
+                                user.id.0,
+                                732986237832527982,
+                                Some(reason),
+                            )
+                            .await
+                        {
+                            Ok(_) => r = format!("Muted: {}", user.mention()),
+                            Err(e) => r = format!("Could not mute user because of: {e}"),
+                        }
+                    } else {
+                        r = "Could not mute user.".into()
+                    }
+                    r
+                }
                 _ => "Unimplimented".into(),
             };
+
+            // todo: return a modal component and pass that to the below interaction response
+            // match command.data.name.as_str() {
+            //     "mute" => {
+            //         let u_user = command
+            //             .data
+            //             .options
+            //             .get(0)
+            //             .expect("Expected user option.")
+            //             .resolved
+            //             .as_ref()
+            //             .expect("Expected user option.");
+            //         let reason = command
+            //             .data
+            //             .options
+            //             .get(1)
+            //             .expect("Expected reason")
+            //             .resolved
+            //             .as_ref()
+            //             .expect("Expected reason");
+            //         let reason = match reason {
+            //             CommandDataOptionValue::String(result) => result,
+            //             _ => "No Reason",
+            //         };
+            //         if let CommandDataOptionValue::User(user, member) = u_user {
+            //             ctx.http
+            //                 .add_member_role(
+            //                     member.clone().unwrap().guild_id.unwrap().0,
+            //                     user.id.0,
+            //                     732986237832527982,
+            //                     Some(reason),
+            //                 )
+            //                 .await
+            //                 .expect("Could not mute user.");
+            //         }
+            //     }
+            //     _ => (),
+            // }
+            // todo: impliment
+            // command.create_interaction_response(&ctx.http, |response| {
+            //     response.kind(InteractionResponseType::Modal)
+            //     .interaction_response_data(|data| data.content())
+            // })
 
             // Respond to slash command with message content or log error of fail.
             if let Err(why) = command
@@ -63,10 +155,29 @@ impl EventHandler for Handler {
         let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
             commands
                 .create_application_command(|command| {
-                    command.name("ping").description("A ping command")
+                    command.name("ping").description("Get bot latency.")
                 })
                 .create_application_command(|command| {
                     command.name("verify").description("Verify your account")
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("mute")
+                        .description("Mute a user")
+                        .default_member_permissions(Permissions::MUTE_MEMBERS)
+                        .create_option(|user| {
+                            user.name("user")
+                                .description("User to Mute")
+                                .kind(CommandOptionType::Mentionable)
+                                .required(true)
+                        })
+                        .create_option(|reason| {
+                            reason
+                                .name("reason")
+                                .description("Reason for muting")
+                                .kind(CommandOptionType::String)
+                                .required(false)
+                        })
                 })
         })
         .await;
@@ -81,6 +192,9 @@ impl EventHandler for Handler {
         .await;
 
         log::info!("Global slash command: {:#?}", guild_command);
+    }
+    async fn resume(&self, _: Context, _: ResumedEvent) {
+        log::info!("Resumed");
     }
 
     async fn guild_member_addition(&self, ctx: Context, new_member: Member) {
@@ -123,7 +237,5 @@ async fn main() {
 
     if let Err(why) = client.start().await {
         log::error!("An error occurred while running the client: {:?}", why);
-    } else {
-        log::info!("Client Ready.");
     }
 }
