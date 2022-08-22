@@ -17,6 +17,8 @@ use serenity::model::{
 };
 use serenity::prelude::*;
 use std::env;
+mod commands;
+use crate::commands::*;
 
 struct Handler;
 
@@ -30,97 +32,13 @@ impl EventHandler for Handler {
             let content: String = match command.data.name.as_str() {
                 "ping" => "Pong!".into(),
                 "help" => "".into(),
-                "verify" => {
-                    let mut member = command.clone().member.unwrap();
-                    let _ = member.add_role(&ctx.http, 785220867180724245).await;
-                    let _ = member.add_role(&ctx.http, 714157786824441886).await;
-                    let _ = member.remove_role(&ctx.http, 853098704063037460).await;
-                    let _ = command.clone().user.direct_message(&ctx, |message| {
-                        message.content(
-                            "Grimgar: Remastered (In-Dev):\n\nThank you for verifying! Don't forget to read rules also!",
-                        )
-                    }).await;
-                    "Verified!".into()
-                }
-                "mute" => {
-                    let u_user = command
-                        .data
-                        .options
-                        .get(0)
-                        .expect("Expected user option.")
-                        .resolved
-                        .as_ref()
-                        .expect("Expected user option.");
-                    let reason = command
-                        .data
-                        .options
-                        .get(1) // warning: makes it required, fix
-                        .expect("Expected reason")
-                        .resolved
-                        .as_ref()
-                        .expect("Expected reason");
-                    let reason = match reason {
-                        CommandDataOptionValue::String(result) => result,
-                        _ => "No Reason",
-                    };
-                    let r: String;
-                    if let CommandDataOptionValue::User(user, _member) = u_user {
-                        match ctx
-                            .http
-                            .add_member_role(
-                                command.guild_id.unwrap().0,
-                                user.id.0,
-                                732986237832527982,
-                                Some(reason),
-                            )
-                            .await
-                        {
-                            Ok(_) => r = format!("Muted: {}", user.mention()),
-                            Err(e) => r = format!("Could not mute user because of: {e}"),
-                        }
-                    } else {
-                        r = "Could not mute user.".into()
-                    }
-                    r
-                }
+                "verify" => verify::verify(&ctx, &command).await,
+                "mute" => mute::mute(&ctx, &command).await,
                 _ => "Unimplimented".into(),
             };
 
             // todo: return a modal component and pass that to the below interaction response
             // match command.data.name.as_str() {
-            //     "mute" => {
-            //         let u_user = command
-            //             .data
-            //             .options
-            //             .get(0)
-            //             .expect("Expected user option.")
-            //             .resolved
-            //             .as_ref()
-            //             .expect("Expected user option.");
-            //         let reason = command
-            //             .data
-            //             .options
-            //             .get(1)
-            //             .expect("Expected reason")
-            //             .resolved
-            //             .as_ref()
-            //             .expect("Expected reason");
-            //         let reason = match reason {
-            //             CommandDataOptionValue::String(result) => result,
-            //             _ => "No Reason",
-            //         };
-            //         if let CommandDataOptionValue::User(user, member) = u_user {
-            //             ctx.http
-            //                 .add_member_role(
-            //                     member.clone().unwrap().guild_id.unwrap().0,
-            //                     user.id.0,
-            //                     732986237832527982,
-            //                     Some(reason),
-            //                 )
-            //                 .await
-            //                 .expect("Could not mute user.");
-            //         }
-            //     }
             //     _ => (),
             // }
             // todo: impliment
