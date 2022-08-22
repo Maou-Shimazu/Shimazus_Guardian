@@ -4,7 +4,7 @@ use serenity::{
     model::application::interaction::application_command::ApplicationCommandInteraction,
     prelude::Context,
 };
-pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction) -> String {
+pub async fn mute<'a>(ctx: &Context, command: &ApplicationCommandInteraction) -> &'a str {
     // todo: remove all roles from user before mute
     let u_user = command
         .data
@@ -27,7 +27,7 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction) -> Str
         CommandDataOptionValue::String(result) => result,
         _ => "No Reason",
     };
-    let r: String;
+    let r: &str;
     if let CommandDataOptionValue::User(user, _member) = u_user {
         for i in _member.clone().unwrap().roles {
             match ctx
@@ -49,11 +49,12 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction) -> Str
             )
             .await
         {
-            Ok(_) => r = format!("Muted: {}!", user.mention()),
-            Err(e) => r = format!("Could not {} user because of: {e}", user.mention()),
+            Ok(_) => r = &format!("Muted: {}!", user.mention()),
+            Err(e) => r = &format!("Could not {} user because of: {e}", user.mention()),
         }
     } else {
         r = "Could not mute user.".into()
     }
-    r
+    // r
+    "mute test"
 }

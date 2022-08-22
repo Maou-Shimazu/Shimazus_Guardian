@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 use serenity::async_trait;
-use serenity::model::prelude::Guild;
+use serenity::builder::CreateEmbed;
+use serenity::model::prelude::{Embed, Guild};
 use serenity::model::{
     application::{
         command::{Command, CommandOptionType},
@@ -20,6 +21,11 @@ use std::env;
 mod commands;
 use crate::commands::*;
 
+enum Content<'a> {
+    String(&'a str),
+    Embed(()),
+}
+
 struct Handler;
 
 #[async_trait]
@@ -29,35 +35,37 @@ impl EventHandler for Handler {
             log::info!("Received command interaction: {:#?}", command);
 
             // Name and content of interactions.
-            let content: String = match command.data.name.as_str() {
-                "ping" => "Pong!".into(),
-                "help" => "".into(),
-                "verify" => verify::verify(&ctx, &command).await,
-                "mute" => mute::mute(&ctx, &command).await,
-                _ => "Unimplimented".into(),
+            let content: Content = match command.data.name.as_str() {
+                "ping" => Content::String("Pong!"),
+                "help" => Content::String(""),
+                "verify" => Content::String(verify::verify(&ctx, &command).await),
+                "mute" => Content::String(mute::mute(&ctx, &command).await),
+                "message" => Content::Embed(message::message(&ctx, &command).await),
+                _ => Content::String("Unimplimented"),
             };
 
+            match content {
+                Content::String(message_response) => {
+                    if let Err(why) = command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| {
+                                    message.content(message_response)
+                                })
+                        })
+                        .await
+                    {
+                        log::error!("Cannot respond to slash command: {}", why);
+                    }
+                }
+                Content::Embed(_) => (), //note: return data and send embeds instead
+            }
+
             // todo: return a modal component and pass that to the below interaction response
-            // match command.data.name.as_str() {
-            //     _ => (),
-            // }
             // todo: impliment
-            // command.create_interaction_response(&ctx.http, |response| {
-            //     response.kind(InteractionResponseType::Modal)
-            //     .interaction_response_data(|data| data.content())
-            // })
 
             // Respond to slash command with message content or log error of fail.
-            if let Err(why) = command
-                .create_interaction_response(&ctx.http, |response| {
-                    response
-                        .kind(InteractionResponseType::ChannelMessageWithSource)
-                        .interaction_response_data(|message| message.content(content))
-                })
-                .await
-            {
-                log::error!("Cannot respond to slash command: {}", why);
-            }
         }
     }
     async fn ready(&self, ctx: Context, ready: Ready) {
@@ -95,6 +103,27 @@ impl EventHandler for Handler {
                                 .description("Reason for muting")
                                 .kind(CommandOptionType::String)
                                 .required(false)
+                        })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("message")
+                        .description("Send a moderator message.")
+                        .default_member_permissions(Permissions::MANAGE_MESSAGES)
+                        .default_member_permissions(Permissions::SEND_MESSAGES)
+                        .create_option(|channel| {
+                            channel
+                                .name("channel")
+                                .description("Channel to send message in")
+                                .kind(CommandOptionType::Channel)
+                                .required(true)
+                        })
+                        .create_option(|message| {
+                            message
+                                .name("message")
+                                .description("message to send")
+                                .kind(CommandOptionType::String)
+                                .required(true)
                         })
                 })
         })

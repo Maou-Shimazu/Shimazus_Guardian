@@ -3,7 +3,7 @@ use serenity::{
     prelude::Context,
 };
 
-pub async fn verify(ctx: &Context, command: &ApplicationCommandInteraction) -> String {
+pub async fn verify<'a>(ctx: &Context, command: &ApplicationCommandInteraction) -> &'a str {
     let mut member = command.clone().member.unwrap();
     let _ = member.add_role(&ctx.http, 785220867180724245).await;
     let _ = member.add_role(&ctx.http, 714157786824441886).await;
@@ -13,5 +13,5 @@ pub async fn verify(ctx: &Context, command: &ApplicationCommandInteraction) -> S
             "Grimgar: Remastered (In-Dev):\n\nThank you for verifying! Don't forget to read rules also!",
         )
     }).await;
-    "Verified!".into()
+    "Verified!"
 }
