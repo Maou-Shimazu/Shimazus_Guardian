@@ -1,11 +1,15 @@
 use serenity::{
     model::{
-        application::interaction::application_command::ApplicationCommandInteraction,
+        application::interaction::{
+            application_command::ApplicationCommandInteraction, InteractionResponseType,
+        },
         prelude::interaction::application_command::CommandDataOptionValue,
+        Timestamp,
     },
     prelude::Context,
+    utils::Colour,
 };
-pub async fn message(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub async fn message(ctx: &Context, command: &ApplicationCommandInteraction) { // refractor to use dashboard
     let channel = command
         .data
         .options
@@ -23,28 +27,40 @@ pub async fn message(ctx: &Context, command: &ApplicationCommandInteraction) {
         .as_ref()
         .expect("Expected message");
 
+    let mem = command.member.clone().unwrap();
+
     if let CommandDataOptionValue::Channel(c) = channel {
         if let CommandDataOptionValue::String(s) = message {
             c.id.send_message(&ctx.http, |msg| {
-                msg.content("Content Title").embed(|embed| {
+                msg.embed(|embed| {
                     embed
-                        .title("This is a title")
-                        .description("This is a description")
-                        .image("attachment://ferris_eyes.png")
-                        .fields(vec![
-                            ("This is the first field", "This is a field body", true),
-                            ("This is the second field", "Both fields are inline", true),
-                        ])
-                        .field(
-                            "This is the third field",
-                            "This is not an inline field",
-                            false,
-                        )
-                        .footer(|f| f.text("This is a footer"))
+                        .description(s)
+                        .author(|f| {
+                            f.name(mem.display_name())
+                                .icon_url(mem.user.avatar_url().unwrap())
+                        })
+                        .timestamp(Timestamp::now())
                 })
             })
             .await
             .expect("could not send message");
         }
+    }
+
+    if let Err(why) = command
+        .create_interaction_response(&ctx.http, |response| {
+            response
+                .kind(InteractionResponseType::ChannelMessageWithSource)
+                .interaction_response_data(|message| {
+                    message.embed(|content| {
+                        content
+                            .title("Successfully sent message! <:Butler:895521263974494248>")
+                            .colour(Colour::DARK_GREEN)
+                    })
+                })
+        })
+        .await
+    {
+        log::error!("Cannot respond to slash command: {}", why);
     }
 }

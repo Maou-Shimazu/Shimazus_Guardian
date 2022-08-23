@@ -39,11 +39,13 @@ impl EventHandler for Handler {
                 "ping" => Content::String("Pong!"),
                 "help" => Content::String(""),
                 "verify" => Content::String(verify::verify(&ctx, &command).await),
-                "mute" => Content::String(mute::mute(&ctx, &command).await),
+                "mute" => Content::Embed(mute::mute(&ctx, &command).await),
                 "message" => Content::Embed(message::message(&ctx, &command).await),
+                "kick" => Content::Embed(kick::kick(&ctx, &command).await),
                 _ => Content::String("Unimplimented"),
             };
 
+            // Respond to slash command with message content or log error of fail.
             match content {
                 Content::String(message_response) => {
                     if let Err(why) = command
@@ -59,13 +61,8 @@ impl EventHandler for Handler {
                         log::error!("Cannot respond to slash command: {}", why);
                     }
                 }
-                Content::Embed(_) => (), //note: return data and send embeds instead
+                Content::Embed(_) => {}
             }
-
-            // todo: return a modal component and pass that to the below interaction response
-            // todo: impliment
-
-            // Respond to slash command with message content or log error of fail.
         }
     }
     async fn ready(&self, ctx: Context, ready: Ready) {
@@ -97,20 +94,25 @@ impl EventHandler for Handler {
                                 .kind(CommandOptionType::Mentionable)
                                 .required(true)
                         })
+                        .create_option(|time| {
+                            time.name("time")
+                                .description("Time for mute command to last")
+                                .kind(CommandOptionType::String)
+                                .required(true)
+                        })
                         .create_option(|reason| {
                             reason
                                 .name("reason")
                                 .description("Reason for muting")
                                 .kind(CommandOptionType::String)
-                                .required(false)
+                                .required(true)
                         })
                 })
                 .create_application_command(|command| {
                     command
                         .name("message")
                         .description("Send a moderator message.")
-                        .default_member_permissions(Permissions::MANAGE_MESSAGES)
-                        .default_member_permissions(Permissions::SEND_MESSAGES)
+                        .default_member_permissions(Permissions::MANAGE_GUILD)
                         .create_option(|channel| {
                             channel
                                 .name("channel")
@@ -122,6 +124,26 @@ impl EventHandler for Handler {
                             message
                                 .name("message")
                                 .description("message to send")
+                                .kind(CommandOptionType::String)
+                                .required(true)
+                        })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("kick")
+                        .description("Kick a member.")
+                        .default_member_permissions(Permissions::KICK_MEMBERS)
+                        .create_option(|channel| {
+                            channel
+                                .name("user")
+                                .description("User to kick.")
+                                .kind(CommandOptionType::User)
+                                .required(true)
+                        })
+                        .create_option(|message| {
+                            message
+                                .name("reason")
+                                .description("Reason for kick.")
                                 .kind(CommandOptionType::String)
                                 .required(true)
                         })
@@ -167,15 +189,12 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
+    env::set_var("RUST_LOG", "grimgar");
     pretty_env_logger::init();
     dotenv::dotenv().ok();
     log::info!("Starting Client.");
 
     let token = env::var("TOKEN").expect("Couldnt get Token.");
-    /*GatewayIntents::non_privileged()
-    | GatewayIntents::MESSAGE_CONTENT
-    | GatewayIntents::GUILD_MESSAGES
-    | GatewayIntents::DIRECT_MESSAGES*/
     let intents = GatewayIntents::all();
     let mut client = Client::builder(token, intents)
         .event_handler(Handler)

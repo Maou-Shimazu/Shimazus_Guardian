@@ -1,10 +1,12 @@
 use serenity::model::application::interaction::application_command::CommandDataOptionValue;
+use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::Mentionable;
+use serenity::utils::Colour;
 use serenity::{
     model::application::interaction::application_command::ApplicationCommandInteraction,
     prelude::Context,
 };
-pub async fn mute<'a>(ctx: &Context, command: &ApplicationCommandInteraction) -> &'a str {
+pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction) {
     // todo: remove all roles from user before mute
     let u_user = command
         .data
@@ -27,7 +29,7 @@ pub async fn mute<'a>(ctx: &Context, command: &ApplicationCommandInteraction) ->
         CommandDataOptionValue::String(result) => result,
         _ => "No Reason",
     };
-    let r: &str;
+    let mut r: String = String::new();
     if let CommandDataOptionValue::User(user, _member) = u_user {
         for i in _member.clone().unwrap().roles {
             match ctx
@@ -49,12 +51,25 @@ pub async fn mute<'a>(ctx: &Context, command: &ApplicationCommandInteraction) ->
             )
             .await
         {
-            Ok(_) => r = &format!("Muted: {}!", user.mention()),
-            Err(e) => r = &format!("Could not {} user because of: {e}", user.mention()),
+            Ok(_) => r = format!("<:Butler:895521263974494248> Muted: {}!", user.mention()),
+            Err(e) => {
+                r = format!(
+                    "<:peepoDetective:803936363849842689> Could not mute {} because of: {e}",
+                    user.mention()
+                )
+            }
         }
-    } else {
-        r = "Could not mute user.".into()
     }
-    // r
-    "mute test"
+    if let Err(why) = command
+        .create_interaction_response(&ctx.http, |response| {
+            response
+                .kind(InteractionResponseType::ChannelMessageWithSource)
+                .interaction_response_data(|message| {
+                    message.embed(|content| content.title(r).colour(Colour::DARK_GREEN))
+                })
+        })
+        .await
+    {
+        log::error!("Cannot respond to slash command: {}", why);
+    }
 }
