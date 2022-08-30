@@ -9,7 +9,7 @@ use serenity::{
     prelude::Context,
     utils::Colour,
 };
-pub async fn kick(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub async fn ban(ctx: &Context, command: &ApplicationCommandInteraction) {
     let u_user = command
         .data
         .options
@@ -26,6 +26,14 @@ pub async fn kick(ctx: &Context, command: &ApplicationCommandInteraction) {
         .resolved
         .as_ref()
         .expect("Expected reason");
+    let days = command
+        .data
+        .options
+        .get(2)
+        .expect("Expected reason")
+        .resolved
+        .as_ref()
+        .expect("Expected reason");
 
     let mut result: String = String::new();
     if let CommandDataOptionValue::User(user, _member) = u_user {
@@ -34,7 +42,7 @@ pub async fn kick(ctx: &Context, command: &ApplicationCommandInteraction) {
                 .direct_message(&ctx.http, |e| {
                     e.embed(|dm| {
                         dm.description(format!(
-                            "You have been kicked from Grimgar: Remastered | {r}",
+                            "You have been banned from Grimgar: Remastered | {r}",
                         ))
                     })
                 })
@@ -52,24 +60,28 @@ pub async fn kick(ctx: &Context, command: &ApplicationCommandInteraction) {
                             })
                         })
                         .await
-                        .expect("Could not send kick falure message");
+                        .expect("Could not send ban falure message");
                 }
+            };
+            let days = match days {
+                CommandDataOptionValue::Integer(r) => r.to_owned() as u8,
+                _ => 0,
             };
             match ctx
                 .http
-                .kick_member_with_reason(command.guild_id.unwrap().0, user.id.0, r)
+                .ban_user(command.guild_id.unwrap().0, user.id.0, days, r)
                 .await
             {
                 Ok(_) => {
                     result = format!(
-                        "<:Butler:895521263974494248> ***{} was kicked*** | {}",
+                        "<:Butler:895521263974494248> ***{} was banned*** | {}",
                         user.tag(),
                         r
                     )
                 }
                 Err(e) => {
                     result = format!(
-                        "<:peepoDetective:803936363849842689> ***Could not kick {}*** | {e}",
+                        "<:peepoDetective:803936363849842689> ***Could not ban {}*** | {e}",
                         user.tag()
                     )
                 }

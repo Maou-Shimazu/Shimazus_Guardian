@@ -42,6 +42,8 @@ impl EventHandler for Handler {
                 "mute" => Content::Embed(mute::mute(&ctx, &command).await),
                 "message" => Content::Embed(message::message(&ctx, &command).await),
                 "kick" => Content::Embed(kick::kick(&ctx, &command).await),
+                "ban" => Content::Embed(ban::ban(&ctx, &command).await),
+                "unban" => Content::Embed(unban::unban(&ctx, &command).await),
                 _ => Content::String("Unimplimented"),
             };
 
@@ -144,6 +146,52 @@ impl EventHandler for Handler {
                             message
                                 .name("reason")
                                 .description("Reason for kick.")
+                                .kind(CommandOptionType::String)
+                                .required(true)
+                        })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("ban")
+                        .description("Ban a member.")
+                        .default_member_permissions(Permissions::BAN_MEMBERS)
+                        .create_option(|channel| {
+                            channel
+                                .name("user")
+                                .description("User to Ban.")
+                                .kind(CommandOptionType::User)
+                                .required(true)
+                        })
+                        .create_option(|message| {
+                            message
+                                .name("reason")
+                                .description("Reason for Ban.")
+                                .kind(CommandOptionType::String)
+                                .required(true)
+                        })
+                        .create_option(|days| {
+                            days.name("days")
+                                .description("Delete message days.")
+                                .kind(CommandOptionType::Integer)
+                                .required(true)
+                        })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("unban")
+                        .description("Unban a member.")
+                        .default_member_permissions(Permissions::BAN_MEMBERS)
+                        .create_option(|channel| {
+                            channel
+                                .name("user")
+                                .description("User to Unban.")
+                                .kind(CommandOptionType::User)
+                                .required(true)
+                        })
+                        .create_option(|message| {
+                            message
+                                .name("reason")
+                                .description("Reason for Ban.")
                                 .kind(CommandOptionType::String)
                                 .required(true)
                         })
