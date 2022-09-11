@@ -44,6 +44,7 @@ impl EventHandler for Handler {
                 "kick" => Content::Embed(kick::kick(&ctx, &command).await),
                 "ban" => Content::Embed(ban::ban(&ctx, &command).await),
                 "unban" => Content::Embed(unban::unban(&ctx, &command).await),
+                "whois" => Content::Embed(whois::whois(&ctx, &command).await),
                 _ => Content::String("Unimplimented"),
             };
 
@@ -194,6 +195,17 @@ impl EventHandler for Handler {
                                 .description("Reason for Ban.")
                                 .kind(CommandOptionType::String)
                                 .required(true)
+                        })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("whois")
+                        .description("Information about a user.")
+                        .create_option(|user| {
+                            user.name("user")
+                                .description("User's information to view.")
+                                .kind(CommandOptionType::User)
+                                .required(false)
                         })
                 })
         })
