@@ -1,1 +1,1 @@
-web: ./target/debug/grimgar.exe
+debug: ./target/debug/grimgar
