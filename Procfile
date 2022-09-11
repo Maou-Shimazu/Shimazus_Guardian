@@ -1,1 +1,1 @@
-debug: ./target/debug/grimgar
+release: ./target/release/grimgar
