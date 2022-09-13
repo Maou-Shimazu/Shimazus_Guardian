@@ -6,6 +6,15 @@ use serenity::{
     model::application::interaction::application_command::ApplicationCommandInteraction,
     prelude::Context,
 };
+use std::fs;
+
+pub fn update_table() {
+    let connection = sqlite::open(":memory:").unwrap();
+    connection
+        .execute(fs::read_to_string("tables.sql").expect("could not open database"))
+        .unwrap();
+}
+
 pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction) {
     // todo: remove all roles from user before mute
     let u_user = command
@@ -59,6 +68,7 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction) {
                 )
             }
         }
+        update_table();
     }
     if let Err(why) = command
         .create_interaction_response(&ctx.http, |response| {
