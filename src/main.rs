@@ -17,9 +17,15 @@ use serenity::model::{
     Timestamp,
 };
 use serenity::prelude::*;
+use sqlx::Sqlite;
+use sqlx::{sqlite::SqlitePool, Pool};
 use std::env;
 mod commands;
 use crate::commands::*;
+
+async fn pool() -> Result<Pool<Sqlite>, sqlx::Error> {
+    Ok(SqlitePool::connect("sqlite:main.sqlite").await?)
+}
 
 enum Content<'a> {
     String(&'a str),
@@ -39,7 +45,14 @@ impl EventHandler for Handler {
                 "ping" => Content::String("Pong!"),
                 "help" => Content::String(""),
                 "verify" => Content::String(verify::verify(&ctx, &command).await),
-                "mute" => Content::Embed(mute::mute(&ctx, &command).await),
+                "mute" => Content::Embed(
+                    mute::mute(
+                        &ctx,
+                        &command,
+                        pool().await.expect("Expected database connection"),
+                    )
+                    .await,
+                ),
                 "message" => Content::Embed(message::message(&ctx, &command).await),
                 "kick" => Content::Embed(kick::kick(&ctx, &command).await),
                 "ban" => Content::Embed(ban::ban(&ctx, &command).await),
@@ -248,11 +261,17 @@ impl EventHandler for Handler {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), sqlx::Error> {
     env::set_var("RUST_LOG", "grimgar");
     pretty_env_logger::init();
     dotenv::dotenv().ok();
     log::info!("Starting Client.");
+
+    let _initialize_query =
+        sqlx::query(&std::fs::read_to_string("tables.sql").expect("could not open file"))
+            .execute(&mut pool().await?.acquire().await?)
+            .await?
+            .last_insert_rowid();
 
     let token = env::var("TOKEN").expect("Couldnt get Token.");
     let intents = GatewayIntents::all();
@@ -264,4 +283,5 @@ async fn main() {
     if let Err(why) = client.start().await {
         log::error!("An error occurred while running the client: {:?}", why);
     }
+    Ok(())
 }

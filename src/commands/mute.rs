@@ -6,16 +6,31 @@ use serenity::{
     model::application::interaction::application_command::ApplicationCommandInteraction,
     prelude::Context,
 };
+use sqlx::{Pool, Sqlite};
 use std::fs;
 
-pub fn update_table() {
-    let connection = sqlite::open(":memory:").unwrap();
-    connection
-        .execute(fs::read_to_string("tables.sql").expect("could not open database"))
-        .unwrap();
+pub async fn new_case(
+    pool: Pool<Sqlite>,
+    moderator: String,
+    reason: String,
+    userid: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(&format!(
+        r#"
+    INSERT INTO cases ( action, moderator, reason, userid )
+    VALUES ( mute, {moderator}, {reason}, {userid} )
+            "#,
+    ))
+    .execute(&mut pool.acquire().await.unwrap())
+    .await
+    .unwrap()
+    .last_insert_rowid();
+    Ok(())
 }
 
-pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub fn update_table() {}
+
+pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: Pool<Sqlite>) {
     // todo: remove all roles from user before mute
     let u_user = command
         .data
@@ -69,6 +84,10 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction) {
             }
         }
         update_table();
+        // warning: add values
+        new_case(pool, String::new(), String::new(), 1)
+            .await
+            .expect("Could not update mute case");
     }
     if let Err(why) = command
         .create_interaction_response(&ctx.http, |response| {
