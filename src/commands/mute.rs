@@ -1,3 +1,4 @@
+use async_std::task;
 use serenity::model::application::interaction::application_command::CommandDataOptionValue;
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::Mentionable;
@@ -8,17 +9,18 @@ use serenity::{
 };
 use sqlx::{Pool, Sqlite};
 use std::fs;
+use std::time::Duration;
 
 pub async fn new_case(
     pool: Pool<Sqlite>,
-    moderator: String,
-    reason: String,
-    userid: i64,
+    moderator: u64,
+    reason: &str,
+    userid: u64,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(&format!(
         r#"
-    INSERT INTO cases ( action, moderator, reason, userid )
-    VALUES ( mute, {moderator}, {reason}, {userid} )
+    INSERT INTO cases ( action, moderator_id, reason, userid )
+    VALUES ( "mute", {moderator}, "{reason}", {userid} )
             "#,
     ))
     .execute(&mut pool.acquire().await.unwrap())
@@ -28,7 +30,9 @@ pub async fn new_case(
     Ok(())
 }
 
-pub fn update_table() {}
+#[allow(dead_code)]
+#[allow(unused_variables)]
+pub fn muted(roles: String, time: u64) {}
 
 pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: Pool<Sqlite>) {
     // todo: remove all roles from user before mute
@@ -40,14 +44,27 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
         .resolved
         .as_ref()
         .expect("Expected user option.");
-    let reason = command
+
+    let time = command
         .data
         .options
-        .get(1) // warning: makes it required, fix
+        .get(1)
         .expect("Expected reason")
         .resolved
         .as_ref()
         .expect("Expected reason");
+
+    let reason = command
+        .data
+        .options
+        .get(2)
+        .expect("Expected reason")
+        .resolved
+        .as_ref()
+        .expect("Expected reason");
+
+    // warning: collect id instead
+    let moderator = command.member.clone().unwrap().user.id.0;
 
     let reason = match reason {
         CommandDataOptionValue::String(result) => result,
@@ -75,17 +92,16 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
             )
             .await
         {
-            Ok(_) => r = format!("<:Butler:895521263974494248> Muted: {}!", user.mention()),
+            Ok(_) => r = format!("<:Butler:895521263974494248> Muted: {}!", user.tag()),
             Err(e) => {
                 r = format!(
                     "<:peepoDetective:803936363849842689> Could not mute {} because of: {e}",
-                    user.mention()
+                    user.tag()
                 )
             }
         }
-        update_table();
-        // warning: add values
-        new_case(pool, String::new(), String::new(), 1)
+        // muted();
+        new_case(pool, moderator, reason, user.id.0)
             .await
             .expect("Could not update mute case");
     }
@@ -100,5 +116,14 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
         .await
     {
         log::error!("Cannot respond to slash command: {}", why);
+    }
+    
+    if let CommandDataOptionValue::Integer(t) = time.clone() {
+        log::info!("Starting unmute timer");
+        task::spawn(async move {
+            log::info!("Sleeping for {t} minutes");
+            task::sleep(Duration::from_secs((t * 60) as u64)).await;
+            log::info!("Finished sleeping, unmuting user.");
+        });
     }
 }

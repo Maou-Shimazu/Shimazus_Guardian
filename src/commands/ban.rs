@@ -35,6 +35,7 @@ pub async fn ban(ctx: &Context, command: &ApplicationCommandInteraction) {
         .as_ref()
         .expect("Expected days");
 
+
     let mut result: String = String::new();
     if let CommandDataOptionValue::User(user, _member) = u_user {
         if let CommandDataOptionValue::String(r) = reason {

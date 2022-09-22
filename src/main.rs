@@ -113,7 +113,7 @@ impl EventHandler for Handler {
                         .create_option(|time| {
                             time.name("time")
                                 .description("Time for mute command to last")
-                                .kind(CommandOptionType::String)
+                                .kind(CommandOptionType::Integer)
                                 .required(true)
                         })
                         .create_option(|reason| {
