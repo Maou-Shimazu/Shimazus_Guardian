@@ -108,7 +108,12 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
             )
             .await
         {
-            Ok(_) => r = format!("<:Butler:895521263974494248> Muted: {}!", user.tag()),
+            Ok(_) => {
+                r = format!(
+                    "<:Butler:895521263974494248> Muted: {} | {reason}",
+                    user.tag()
+                )
+            }
             Err(e) => {
                 r = format!(
                     "<:peepoDetective:803936363849842689> Could not mute {} because of: {e}",
@@ -121,6 +126,46 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
             .await
             .expect("Could not update mute case");
     }
+    if let CommandDataOptionValue::Integer(t) = time.clone() {
+        log::info!("Starting unmute timer");
+        let temp = ctx.clone();
+        let cmd = command.clone();
+        if let CommandDataOptionValue::User(user, _member) = u_user.clone() {
+            task::spawn(async move {
+                // note: reason and default reason
+                log::info!("Sleeping for {t} minutes");
+                task::sleep(Duration::from_secs((t * 60) as u64)).await;
+                log::info!("Finished sleeping, unmuting user.");
+                temp.http
+                    .remove_member_role(
+                        cmd.guild_id.unwrap().0,
+                        user.id.0,
+                        732986237832527982,
+                        Some("Unmuting"),
+                    )
+                    .await
+                    .expect("Could not remove muted role");
+                let roles = crate::commands::unmute::get_roles(&pool, user.id.0 as i64)
+                    .await
+                    .expect("Could not get roles");
+                let vroles: Vec<u64> = roles
+                    .split(" ")
+                    .map(|x| x.parse::<u64>().unwrap())
+                    .collect();
+
+                log::info!("roles: {vroles:?}");
+                for role in vroles {
+                    temp.http
+                        .add_member_role(cmd.guild_id.unwrap().0, user.id.0, role, Some("Unmuting"))
+                        .await
+                        .expect("Could not return role from unmute");
+                }
+                crate::commands::unmute::drop_muted_info(&pool, user.id.0 as i64)
+                    .await
+                    .expect("Could not drop user from muted.");
+            });
+        }
+    }
     if let Err(why) = command
         .create_interaction_response(&ctx.http, |response| {
             response
@@ -132,14 +177,5 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
         .await
     {
         log::error!("Cannot respond to slash command: {}", why);
-    }
-
-    if let CommandDataOptionValue::Integer(t) = time.clone() {
-        log::info!("Starting unmute timer");
-        task::spawn(async move {
-            log::info!("Sleeping for {t} minutes");
-            task::sleep(Duration::from_secs((t * 60) as u64)).await;
-            log::info!("Finished sleeping, unmuting user.");
-        });
     }
 }

@@ -11,6 +11,10 @@ use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use std::fs;
 use std::time::Duration;
 
+/// Get the roles from the muted table. Query: 
+/// ```sql
+/// SELECT roles FROM muted WHERE userid = ?1
+/// ```
 pub async fn get_roles(pool: &SqlitePool, id: i64) -> Result<String, sqlx::Error> {
     let res = sqlx::query!(
         r#"
@@ -25,11 +29,20 @@ pub async fn get_roles(pool: &SqlitePool, id: i64) -> Result<String, sqlx::Error
     Ok(res.roles.unwrap())
 }
 
-pub async fn drop_muted_info(userid: u64) {
-    // delete from muted where userid={};
+/// Drop user from the table when they are unmuted Query: 
+/// ```sql
+/// DELETE FROM muted WHERE userid = ?1
+/// ```
+pub async fn drop_muted_info(pool: &SqlitePool, userid: i64) -> Result<(), sqlx::Error> {
+    sqlx::query!("DELETE FROM muted WHERE userid = ?1", userid)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub async fn unmute(ctx: &Context, command: &ApplicationCommandInteraction, pool: Pool<Sqlite>) {
+    // warning: check if user has mute role
+    // note: add reason
     let u_user = command
         .data
         .options
@@ -43,7 +56,7 @@ pub async fn unmute(ctx: &Context, command: &ApplicationCommandInteraction, pool
     if let CommandDataOptionValue::User(user, _member) = u_user {
         match ctx
             .http
-            .add_member_role(
+            .remove_member_role(
                 command.guild_id.unwrap().0,
                 user.id.0,
                 732986237832527982,
@@ -80,13 +93,16 @@ pub async fn unmute(ctx: &Context, command: &ApplicationCommandInteraction, pool
                 .await
                 .expect("Could not return role from unmute");
         }
+        drop_muted_info(&pool, user.id.0 as i64)
+            .await
+            .expect("Could not drop user from muted.");
     }
     if let Err(why) = command
         .create_interaction_response(&ctx.http, |response| {
             response
                 .kind(InteractionResponseType::ChannelMessageWithSource)
                 .interaction_response_data(|message| {
-                    message.embed(|content| content.title(r).colour(Colour::DARK_GREEN))
+                    message.embed(|content| content.description(r).colour(Colour::DARK_GREEN))
                 })
         })
         .await

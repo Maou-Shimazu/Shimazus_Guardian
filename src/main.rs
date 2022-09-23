@@ -67,7 +67,7 @@ impl EventHandler for Handler {
                     )
                     .await,
                 ),
-                _ => Content::Embed(()),
+                _ => Content::String("Unimplimented"),
             };
 
             // Respond to slash command with message content or log error of fail.
