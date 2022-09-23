@@ -21,6 +21,7 @@ use sqlx::Sqlite;
 use sqlx::{sqlite::SqlitePool, Pool};
 use std::env;
 mod commands;
+mod moderation;
 use crate::commands::*;
 
 async fn pool() -> Result<Pool<Sqlite>, sqlx::Error> {
@@ -58,7 +59,15 @@ impl EventHandler for Handler {
                 "ban" => Content::Embed(ban::ban(&ctx, &command).await),
                 "unban" => Content::Embed(unban::unban(&ctx, &command).await),
                 "whois" => Content::Embed(whois::whois(&ctx, &command).await),
-                _ => Content::String("Unimplimented"),
+                "unmute" => Content::Embed(
+                    unmute::unmute(
+                        &ctx,
+                        &command,
+                        pool().await.expect("Expected database connection"),
+                    )
+                    .await,
+                ),
+                _ => Content::Embed(()),
             };
 
             // Respond to slash command with message content or log error of fail.
@@ -112,7 +121,7 @@ impl EventHandler for Handler {
                         })
                         .create_option(|time| {
                             time.name("time")
-                                .description("Time for mute command to last")
+                                .description("Time (Minutes) for mute command to last")
                                 .kind(CommandOptionType::Integer)
                                 .required(true)
                         })
@@ -219,6 +228,18 @@ impl EventHandler for Handler {
                                 .description("User's information to view.")
                                 .kind(CommandOptionType::User)
                                 .required(false)
+                        })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("unmute")
+                        .description("Unmute a user")
+                        .default_member_permissions(Permissions::MUTE_MEMBERS)
+                        .create_option(|user| {
+                            user.name("user")
+                                .description("User to unmute")
+                                .kind(CommandOptionType::User)
+                                .required(true)
                         })
                 })
         })

@@ -1,6 +1,7 @@
 use async_std::task;
 use serenity::model::application::interaction::application_command::CommandDataOptionValue;
 use serenity::model::prelude::interaction::InteractionResponseType;
+use serenity::model::prelude::RoleId;
 use serenity::prelude::Mentionable;
 use serenity::utils::Colour;
 use serenity::{
@@ -23,19 +24,31 @@ pub async fn new_case(
     VALUES ( "mute", {moderator}, "{reason}", {userid} )
             "#,
     ))
-    .execute(&mut pool.acquire().await.unwrap())
-    .await
-    .unwrap()
+    .execute(&mut pool.acquire().await?)
+    .await?
     .last_insert_rowid();
     Ok(())
 }
 
-#[allow(dead_code)]
-#[allow(unused_variables)]
-pub fn muted(roles: String, time: u64) {}
+pub async fn muted(pool: Pool<Sqlite>, userid: u64, roles: Vec<RoleId>) -> Result<(), sqlx::Error> {
+    let mut temp: Vec<String> = vec![];
+    roles.iter().for_each(|i| {
+        temp.push(i.0.to_string());
+    });
+    let role: String = temp.join(" ");
+    log::info!("id: {userid}, roles: {role}");
+    sqlx::query(&format!(
+        r#"
+        INSERT INTO muted ( userid, roles )
+        VALUES ( {userid}, "{role}" )"#,
+    ))
+    .execute(&mut pool.acquire().await?)
+    .await?
+    .last_insert_rowid();
+    Ok(())
+}
 
 pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: Pool<Sqlite>) {
-    // todo: remove all roles from user before mute
     let u_user = command
         .data
         .options
@@ -72,6 +85,9 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
     };
     let mut r: String = String::new();
     if let CommandDataOptionValue::User(user, _member) = u_user {
+        muted(pool.clone(), user.id.0, _member.clone().unwrap().roles)
+            .await
+            .expect("Couldnt update muted table");
         for i in _member.clone().unwrap().roles {
             match ctx
                 .http
@@ -101,7 +117,7 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
             }
         }
         // muted();
-        new_case(pool, moderator, reason, user.id.0)
+        new_case(pool.clone(), moderator, reason, user.id.0)
             .await
             .expect("Could not update mute case");
     }
@@ -117,7 +133,7 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
     {
         log::error!("Cannot respond to slash command: {}", why);
     }
-    
+
     if let CommandDataOptionValue::Integer(t) = time.clone() {
         log::info!("Starting unmute timer");
         task::spawn(async move {
