@@ -283,6 +283,8 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
+    // note: add an event for listening to case updates in [`moderation`].
+    // note: send mod embeds about each case update.
     env::set_var("RUST_LOG", "grimgar");
     pretty_env_logger::init();
     dotenv::dotenv().ok();
