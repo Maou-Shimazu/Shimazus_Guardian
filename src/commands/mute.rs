@@ -12,23 +12,8 @@ use sqlx::{Pool, Sqlite};
 use std::fs;
 use std::time::Duration;
 
-pub async fn new_case(
-    pool: Pool<Sqlite>,
-    moderator: u64,
-    reason: &str,
-    userid: u64,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(&format!(
-        r#"
-    INSERT INTO cases ( action, moderator_id, reason, userid )
-    VALUES ( "mute", {moderator}, "{reason}", {userid} )
-            "#,
-    ))
-    .execute(&mut pool.acquire().await?)
-    .await?
-    .last_insert_rowid();
-    Ok(())
-}
+use crate::moderation::cases::{new_case, Moderation};
+use crate::moderation::log::modlog;
 
 pub async fn muted(pool: Pool<Sqlite>, userid: u64, roles: Vec<RoleId>) -> Result<(), sqlx::Error> {
     let mut temp: Vec<String> = vec![];
@@ -76,7 +61,6 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
         .as_ref()
         .expect("Expected reason");
 
-    // warning: collect id instead
     let moderator = command.member.clone().unwrap().user.id.0;
 
     let reason = match reason {
@@ -122,9 +106,13 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
             }
         }
         // muted();
-        new_case(pool.clone(), moderator, reason, user.id.0)
+        let id = new_case(pool.clone(), Moderation::Mute, moderator, reason, user.id.0)
             .await
             .expect("Could not update mute case");
+
+        modlog(&ctx.clone(), &pool.clone(), id)
+            .await
+            .expect("Could not update mod log");
     }
     if let CommandDataOptionValue::Integer(t) = time.clone() {
         log::info!("Starting unmute timer");
@@ -133,9 +121,11 @@ pub async fn mute(ctx: &Context, command: &ApplicationCommandInteraction, pool: 
         if let CommandDataOptionValue::User(user, _member) = u_user.clone() {
             task::spawn(async move {
                 // note: reason and default reason
+                // warning: send unmute event
                 log::info!("Sleeping for {t} minutes");
                 task::sleep(Duration::from_secs((t * 60) as u64)).await;
                 log::info!("Finished sleeping, unmuting user.");
+                // warning: check if user has  mute role still
                 temp.http
                     .remove_member_role(
                         cmd.guild_id.unwrap().0,

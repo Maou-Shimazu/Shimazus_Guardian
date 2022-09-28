@@ -9,7 +9,13 @@ use serenity::{
     prelude::Context,
     utils::Colour,
 };
-pub async fn ban(ctx: &Context, command: &ApplicationCommandInteraction) {
+use sqlx::{Pool, Sqlite};
+
+use crate::moderation::{
+    cases::{new_case, Moderation},
+    log::modlog,
+};
+pub async fn ban(ctx: &Context, command: &ApplicationCommandInteraction, pool: Pool<Sqlite>) {
     let u_user = command
         .data
         .options
@@ -35,7 +41,7 @@ pub async fn ban(ctx: &Context, command: &ApplicationCommandInteraction) {
         .as_ref()
         .expect("Expected days");
 
-
+    let moderator = command.member.clone().unwrap().user.id.0;
     let mut result: String = String::new();
     if let CommandDataOptionValue::User(user, _member) = u_user {
         if let CommandDataOptionValue::String(r) = reason {
@@ -87,6 +93,12 @@ pub async fn ban(ctx: &Context, command: &ApplicationCommandInteraction) {
                     )
                 }
             };
+            let id = new_case(pool.clone(), Moderation::Ban, moderator, r, user.id.0)
+                .await
+                .expect("Could not update ban case");
+            modlog(&ctx, &pool, id)
+                .await
+                .expect("Could not send to modlog");
         }
     }
     if let Err(why) = command

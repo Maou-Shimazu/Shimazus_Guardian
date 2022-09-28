@@ -44,7 +44,7 @@ pub async fn unmute(ctx: &Context, command: &ApplicationCommandInteraction, pool
     // warning: check if user has mute role
     // note: add reason
     let u_user = command
-        .data
+        .data   
         .options
         .get(0)
         .expect("Expected user option.")

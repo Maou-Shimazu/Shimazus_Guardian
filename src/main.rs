@@ -22,6 +22,7 @@ use sqlx::{sqlite::SqlitePool, Pool};
 use std::env;
 mod commands;
 mod moderation;
+// mod event; dunno if we're actually gonna use this
 use crate::commands::*;
 
 async fn pool() -> Result<Pool<Sqlite>, sqlx::Error> {
@@ -56,7 +57,14 @@ impl EventHandler for Handler {
                 ),
                 "message" => Content::Embed(message::message(&ctx, &command).await),
                 "kick" => Content::Embed(kick::kick(&ctx, &command).await),
-                "ban" => Content::Embed(ban::ban(&ctx, &command).await),
+                "ban" => Content::Embed(
+                    ban::ban(
+                        &ctx,
+                        &command,
+                        pool().await.expect("Expected database connection"),
+                    )
+                    .await,
+                ),
                 "unban" => Content::Embed(unban::unban(&ctx, &command).await),
                 "whois" => Content::Embed(whois::whois(&ctx, &command).await),
                 "unmute" => Content::Embed(
@@ -67,6 +75,7 @@ impl EventHandler for Handler {
                     )
                     .await,
                 ),
+                "av" => Content::Embed(av::av(&ctx, &command).await),
                 _ => Content::String("Unimplimented"),
             };
 
@@ -240,6 +249,17 @@ impl EventHandler for Handler {
                                 .description("User to unmute")
                                 .kind(CommandOptionType::User)
                                 .required(true)
+                        })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("av")
+                        .description("Get a user's avatar.")
+                        .create_option(|user| {
+                            user.name("user")
+                                .description("User to unmute")
+                                .kind(CommandOptionType::User)
+                                .required(false)
                         })
                 })
         })

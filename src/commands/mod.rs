@@ -7,3 +7,4 @@ pub mod ban;
 pub mod unban;
 pub mod whois;
 pub mod unmute;
+pub mod av;
