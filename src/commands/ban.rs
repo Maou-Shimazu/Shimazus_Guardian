@@ -11,7 +11,7 @@ use serenity::{
 };
 use sqlx::{Pool, Sqlite};
 
-use crate::moderation::{
+use crate::core::{
     cases::{new_case, Moderation},
     log::modlog,
 };

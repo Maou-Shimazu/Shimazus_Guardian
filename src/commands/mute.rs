@@ -12,8 +12,8 @@ use sqlx::{Pool, Sqlite};
 use std::fs;
 use std::time::Duration;
 
-use crate::moderation::cases::{new_case, Moderation};
-use crate::moderation::log::modlog;
+use crate::core::cases::{new_case, Moderation};
+use crate::core::log::modlog;
 
 pub async fn muted(pool: Pool<Sqlite>, userid: u64, roles: Vec<RoleId>) -> Result<(), sqlx::Error> {
     let mut temp: Vec<String> = vec![];

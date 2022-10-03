@@ -24,11 +24,11 @@ pub async fn modlog(ctx: &Context, pool: &SqlitePool, id: i64) -> Result<(), sql
 
     let user = ctx
         .http
-        .get_user(table.userid.clone().unwrap() as u64)
+        .get_user(table.userid.clone() as u64)
         .await
         .unwrap();
 
-    let color = match table.action.clone().unwrap().as_str() {
+    let color = match table.action.clone().as_str() {
         "Mute" => Colour::from_rgb(255, 71, 15),
         "Ban" => Colour::from_rgb(240, 74, 71),
         "Unban" => Colour::from_rgb(250, 219, 94),
@@ -53,25 +53,21 @@ pub async fn modlog(ctx: &Context, pool: &SqlitePool, id: i64) -> Result<(), sql
                     .author(|f| {
                         f.name(&format!(
                             "Case {id} | {} | {}",
-                            table.action.clone().unwrap(),
+                            table.action.clone(),
                             user.tag()
                         ))
                         .icon_url(user.avatar_url().unwrap())
                     })
                     .fields(vec![
-                        (
-                            "User",
-                            format!("<@{}>", table.userid.clone().unwrap()),
-                            true,
-                        ),
+                        ("User", format!("<@{}>", table.userid.clone()), true),
                         (
                             "Moderator",
-                            format!("<@{}>", table.moderator_id.clone().unwrap()),
+                            format!("<@{}>", table.moderator_id.clone()),
                             true,
                         ),
-                        ("Reason", table.reason.clone().unwrap(), true),
+                        ("Reason", table.reason.clone(), true),
                     ])
-                    .footer(|footer| footer.text(format!("ID: {}", table.userid.clone().unwrap())))
+                    .footer(|footer| footer.text(format!("ID: {}", table.userid.clone())))
                     .timestamp(Timestamp::now())
                     .color(color)
             })

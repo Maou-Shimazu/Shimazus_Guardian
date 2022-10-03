@@ -26,7 +26,7 @@ pub async fn get_roles(pool: &SqlitePool, id: i64) -> Result<String, sqlx::Error
     )
     .fetch_one(pool)
     .await?;
-    Ok(res.roles.unwrap())
+    Ok(res.roles)
 }
 
 /// Drop user from the table when they are unmuted Query: 
