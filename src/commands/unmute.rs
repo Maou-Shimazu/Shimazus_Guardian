@@ -26,7 +26,7 @@ pub async fn get_roles(pool: &SqlitePool, id: i64) -> Result<String, sqlx::Error
     )
     .fetch_one(pool)
     .await?;
-    Ok(res.roles.unwrap())
+    Ok(res.roles)
 }
 
 /// Drop user from the table when they are unmuted Query: 
@@ -44,7 +44,7 @@ pub async fn unmute(ctx: &Context, command: &ApplicationCommandInteraction, pool
     // warning: check if user has mute role
     // note: add reason
     let u_user = command
-        .data
+        .data   
         .options
         .get(0)
         .expect("Expected user option.")

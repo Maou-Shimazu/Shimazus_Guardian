@@ -20,8 +20,9 @@ use serenity::prelude::*;
 use sqlx::Sqlite;
 use sqlx::{sqlite::SqlitePool, Pool};
 use std::env;
+mod app;
 mod commands;
-mod moderation;
+mod core;
 use crate::commands::*;
 
 async fn pool() -> Result<Pool<Sqlite>, sqlx::Error> {
@@ -44,7 +45,7 @@ impl EventHandler for Handler {
             // Name and content of interactions.
             let content: Content = match command.data.name.as_str() {
                 "ping" => Content::String("Pong!"),
-                "help" => Content::String(""),
+                "help" => Content::Embed(help::help(&ctx, &command).await),
                 "verify" => Content::String(verify::verify(&ctx, &command).await),
                 "mute" => Content::Embed(
                     mute::mute(
@@ -56,7 +57,14 @@ impl EventHandler for Handler {
                 ),
                 "message" => Content::Embed(message::message(&ctx, &command).await),
                 "kick" => Content::Embed(kick::kick(&ctx, &command).await),
-                "ban" => Content::Embed(ban::ban(&ctx, &command).await),
+                "ban" => Content::Embed(
+                    ban::ban(
+                        &ctx,
+                        &command,
+                        pool().await.expect("Expected database connection"),
+                    )
+                    .await,
+                ),
                 "unban" => Content::Embed(unban::unban(&ctx, &command).await),
                 "whois" => Content::Embed(whois::whois(&ctx, &command).await),
                 "unmute" => Content::Embed(
@@ -67,6 +75,7 @@ impl EventHandler for Handler {
                     )
                     .await,
                 ),
+                "av" => Content::Embed(av::av(&ctx, &command).await),
                 _ => Content::String("Unimplimented"),
             };
 
@@ -102,159 +111,26 @@ impl EventHandler for Handler {
 
         let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
             commands
-                .create_application_command(|command| {
-                    command.name("ping").description("Get bot latency.")
-                })
-                .create_application_command(|command| {
-                    command.name("verify").description("Verify your account")
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("mute")
-                        .description("Mute a user")
-                        .default_member_permissions(Permissions::MUTE_MEMBERS)
-                        .create_option(|user| {
-                            user.name("user")
-                                .description("User to Mute")
-                                .kind(CommandOptionType::Mentionable)
-                                .required(true)
-                        })
-                        .create_option(|time| {
-                            time.name("time")
-                                .description("Time (Minutes) for mute command to last")
-                                .kind(CommandOptionType::Integer)
-                                .required(true)
-                        })
-                        .create_option(|reason| {
-                            reason
-                                .name("reason")
-                                .description("Reason for muting")
-                                .kind(CommandOptionType::String)
-                                .required(true)
-                        })
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("message")
-                        .description("Send a moderator message.")
-                        .default_member_permissions(Permissions::MANAGE_GUILD)
-                        .create_option(|channel| {
-                            channel
-                                .name("channel")
-                                .description("Channel to send message in")
-                                .kind(CommandOptionType::Channel)
-                                .required(true)
-                        })
-                        .create_option(|message| {
-                            message
-                                .name("message")
-                                .description("message to send")
-                                .kind(CommandOptionType::String)
-                                .required(true)
-                        })
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("kick")
-                        .description("Kick a member.")
-                        .default_member_permissions(Permissions::KICK_MEMBERS)
-                        .create_option(|channel| {
-                            channel
-                                .name("user")
-                                .description("User to kick.")
-                                .kind(CommandOptionType::User)
-                                .required(true)
-                        })
-                        .create_option(|message| {
-                            message
-                                .name("reason")
-                                .description("Reason for kick.")
-                                .kind(CommandOptionType::String)
-                                .required(true)
-                        })
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("ban")
-                        .description("Ban a member.")
-                        .default_member_permissions(Permissions::BAN_MEMBERS)
-                        .create_option(|channel| {
-                            channel
-                                .name("user")
-                                .description("User to Ban.")
-                                .kind(CommandOptionType::User)
-                                .required(true)
-                        })
-                        .create_option(|message| {
-                            message
-                                .name("reason")
-                                .description("Reason for Ban.")
-                                .kind(CommandOptionType::String)
-                                .required(true)
-                        })
-                        .create_option(|days| {
-                            days.name("days")
-                                .description("Delete message days.")
-                                .kind(CommandOptionType::Integer)
-                                .required(true)
-                        })
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("unban")
-                        .description("Unban a member.")
-                        .default_member_permissions(Permissions::BAN_MEMBERS)
-                        .create_option(|channel| {
-                            channel
-                                .name("user")
-                                .description("User to Unban.")
-                                .kind(CommandOptionType::User)
-                                .required(true)
-                        })
-                        .create_option(|message| {
-                            message
-                                .name("reason")
-                                .description("Reason for Ban.")
-                                .kind(CommandOptionType::String)
-                                .required(true)
-                        })
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("whois")
-                        .description("Information about a user.")
-                        .create_option(|user| {
-                            user.name("user")
-                                .description("User's information to view.")
-                                .kind(CommandOptionType::User)
-                                .required(false)
-                        })
-                })
-                .create_application_command(|command| {
-                    command
-                        .name("unmute")
-                        .description("Unmute a user")
-                        .default_member_permissions(Permissions::MUTE_MEMBERS)
-                        .create_option(|user| {
-                            user.name("user")
-                                .description("User to unmute")
-                                .kind(CommandOptionType::User)
-                                .required(true)
-                        })
-                })
+                .create_application_command(|command| app::ping::register(command))
+                .create_application_command(|command| app::verify::register(command))
+                .create_application_command(|command| app::mute::register(command))
+                .create_application_command(|command| app::message::register(command))
+                .create_application_command(|command| app::kick::register(command))
+                .create_application_command(|command| app::ban::register(command))
+                .create_application_command(|command| app::unban::register(command))
+                .create_application_command(|command| app::whois::register(command))
+                .create_application_command(|command| app::unmute::register(command))
+                .create_application_command(|command| app::av::register(command))
+                .create_application_command(|command| app::help::register(command))
         })
         .await;
 
         log::info!("Guild slash commands: {:#?}", commands);
 
-        let guild_command = Command::create_global_application_command(&ctx.http, |command| {
-            command
-                .name("help")
-                .description("View available commands for Grimgar.")
-        })
-        .await;
+        // let guild_command =
+        // Command::create_global_application_command(&ctx.http, |command| {}).await;
 
-        log::info!("Global slash command: {:#?}", guild_command);
+        // log::info!("Global slash command: {:#?}", guild_command);
     }
     async fn resume(&self, _: Context, _: ResumedEvent) {
         log::info!("Resumed");
