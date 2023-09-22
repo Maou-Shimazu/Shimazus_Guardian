@@ -4,11 +4,27 @@ use serenity::{
             application_command::ApplicationCommandInteraction, InteractionResponseType,
         },
         prelude::interaction::application_command::CommandDataOptionValue,
-        Timestamp, user::User,
+        user::User,
+        Timestamp,
     },
     prelude::Context,
     utils::Colour,
 };
+
+use serenity::builder::CreateApplicationCommand;
+use serenity::model::prelude::command::CommandOptionType;
+
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command
+        .name("av")
+        .description("Get a user's avatar.")
+        .create_option(|user| {
+            user.name("user")
+                .description("User to unmute")
+                .kind(CommandOptionType::User)
+                .required(false)
+        })
+}
 
 pub async fn av(ctx: &Context, command: &ApplicationCommandInteraction) {
     let user: &CommandDataOptionValue;
@@ -22,7 +38,6 @@ pub async fn av(ctx: &Context, command: &ApplicationCommandInteraction) {
             avatar = uuser.avatar_url();
             id = uuser.clone();
         }
-    
     } else {
         id = command.member.clone().unwrap().user;
         avatar = command.member.clone().unwrap().user.avatar_url();
@@ -36,10 +51,7 @@ pub async fn av(ctx: &Context, command: &ApplicationCommandInteraction) {
                     message.embed(|content| {
                         content
                             .title("Avatar")
-                            .author(|f| {
-                                f.name(id.tag())
-                                    .icon_url(id.avatar_url().unwrap())
-                            })
+                            .author(|f| f.name(id.tag()).icon_url(id.avatar_url().unwrap()))
                             .image(avatar.unwrap())
                             .colour(Colour::BLURPLE)
                     })

@@ -9,6 +9,32 @@ use serenity::{
     prelude::Context,
     utils::Colour,
 };
+
+use serenity::builder::CreateApplicationCommand;
+use serenity::model::prelude::command::CommandOptionType;
+use serenity::model::Permissions;
+
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command
+        .name("unban")
+        .description("Unban a member.")
+        .default_member_permissions(Permissions::BAN_MEMBERS)
+        .create_option(|channel| {
+            channel
+                .name("user")
+                .description("User to Unban.")
+                .kind(CommandOptionType::User)
+                .required(true)
+        })
+        .create_option(|message| {
+            message
+                .name("reason")
+                .description("Reason for Ban.")
+                .kind(CommandOptionType::String)
+                .required(true)
+        })
+}
+
 pub async fn unban(ctx: &Context, command: &ApplicationCommandInteraction) {
     let u_user = command
         .data

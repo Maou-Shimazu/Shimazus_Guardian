@@ -3,6 +3,17 @@ use serenity::{
     prelude::Context,
 };
 
+use serenity::builder::CreateApplicationCommand;
+use serenity::model::prelude::command::CommandOptionType;
+use serenity::model::prelude::interaction::application_command::{
+    CommandDataOption, CommandDataOptionValue,
+};
+
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command.name("verify").description("Verify your account")
+}
+
+
 pub async fn verify<'a>(ctx: &Context, command: &ApplicationCommandInteraction) -> &'a str {
     let mut member = command.clone().member.unwrap();
     let _ = member.add_role(&ctx.http, 785220867180724245).await;

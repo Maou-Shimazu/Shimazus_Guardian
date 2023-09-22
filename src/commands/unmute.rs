@@ -11,7 +11,24 @@ use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use std::fs;
 use std::time::Duration;
 
-/// Get the roles from the muted table. Query: 
+use serenity::builder::CreateApplicationCommand;
+use serenity::model::prelude::command::CommandOptionType;
+use serenity::model::Permissions;
+
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command
+        .name("unmute")
+        .description("Unmute a user")
+        .default_member_permissions(Permissions::MUTE_MEMBERS)
+        .create_option(|user| {
+            user.name("user")
+                .description("User to unmute")
+                .kind(CommandOptionType::User)
+                .required(true)
+        })
+}
+
+/// Get the roles from the muted table. Query:
 /// ```sql
 /// SELECT roles FROM muted WHERE userid = ?1
 /// ```
@@ -29,7 +46,7 @@ pub async fn get_roles(pool: &SqlitePool, id: i64) -> Result<String, sqlx::Error
     Ok(res.roles)
 }
 
-/// Drop user from the table when they are unmuted Query: 
+/// Drop user from the table when they are unmuted Query:
 /// ```sql
 /// DELETE FROM muted WHERE userid = ?1
 /// ```
@@ -44,7 +61,7 @@ pub async fn unmute(ctx: &Context, command: &ApplicationCommandInteraction, pool
     // warning: check if user has mute role
     // note: add reason
     let u_user = command
-        .data   
+        .data
         .options
         .get(0)
         .expect("Expected user option.")

@@ -1,3 +1,14 @@
+use serenity::builder::CreateApplicationCommand;
+use serenity::model::prelude::command::CommandOptionType;
+use serenity::model::prelude::interaction::application_command::{
+    CommandDataOption,
+    CommandDataOptionValue,
+};
+
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command.name("ping").description("Get bot latency.")
+}
+
 // tokio::spawn(async move {
 //     let elements = {
 //         let data_read = ctx_clone.data.read().await;

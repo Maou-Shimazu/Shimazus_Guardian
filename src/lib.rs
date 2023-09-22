@@ -1,6 +1,9 @@
 #![allow(unused_imports)]
+use anyhow::anyhow;
 use serenity::async_trait;
 use serenity::builder::CreateEmbed;
+use serenity::model::channel::Message;
+use serenity::model::gateway::Ready;
 use serenity::model::prelude::{Embed, Guild};
 use serenity::model::{
     application::{
@@ -9,35 +12,35 @@ use serenity::model::{
             application_command::CommandDataOptionValue, Interaction, InteractionResponseType,
         },
     },
-    channel::Message,
-    gateway::Ready,
     id::{ChannelId, GuildId},
     permissions::Permissions,
     prelude::{Member, ResumedEvent},
     Timestamp,
 };
 use serenity::prelude::*;
+use serenity::prelude::*;
+use shuttle_secrets::SecretStore;
 use sqlx::Sqlite;
 use sqlx::{sqlite::SqlitePool, Pool};
 use std::env;
+use tracing::{error, info};
 mod commands;
 mod core;
 mod tickets;
 use crate::commands::*;
 
-async fn pool() -> Result<Pool<Sqlite>, sqlx::Error> {
-    Ok(SqlitePool::connect("sqlite:main.sqlite").await?)
+struct Bot {
+    database: SqlitePool,
+    guild_id: String,
 }
 
-enum Content<'a> { 
+enum Content<'a> {
     String(&'a str),
     Embed(()),
 }
 
-struct Handler;
-
 #[async_trait]
-impl EventHandler for Handler {
+impl EventHandler for Bot {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             log::info!("Received command interaction: {:#?}", command);
@@ -47,34 +50,15 @@ impl EventHandler for Handler {
                 "ping" => Content::String("Pong!"),
                 "help" => Content::Embed(help::help(&ctx, &command).await),
                 "verify" => Content::String(verify::verify(&ctx, &command).await),
-                "mute" => Content::Embed(
-                    mute::mute(
-                        &ctx,
-                        &command,
-                        pool().await.expect("Expected database connection"),
-                    )
-                    .await,
-                ),
+                "mute" => Content::Embed(mute::mute(&ctx, &command, self.database.clone()).await),
                 "message" => Content::Embed(message::message(&ctx, &command).await),
                 "kick" => Content::Embed(kick::kick(&ctx, &command).await),
-                "ban" => Content::Embed(
-                    ban::ban(
-                        &ctx,
-                        &command,
-                        pool().await.expect("Expected database connection"),
-                    )
-                    .await,
-                ),
+                "ban" => Content::Embed(ban::ban(&ctx, &command, self.database.clone()).await),
                 "unban" => Content::Embed(unban::unban(&ctx, &command).await),
                 "whois" => Content::Embed(whois::whois(&ctx, &command).await),
-                "unmute" => Content::Embed(
-                    unmute::unmute(
-                        &ctx,
-                        &command,
-                        pool().await.expect("Expected database connection"),
-                    )
-                    .await,
-                ),
+                "unmute" => {
+                    Content::Embed(unmute::unmute(&ctx, &command, self.database.clone()).await)
+                }
                 "av" => Content::Embed(av::av(&ctx, &command).await),
                 "ticket" => Content::Embed(tickets::ticket::ticket(&ctx, &command).await),
                 "close" => Content::Embed(tickets::close::close(&ctx, &command).await),
@@ -161,30 +145,26 @@ impl EventHandler for Handler {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), sqlx::Error> {
-    // note: add an event for listening to case updates in [`moderation`].
-    // note: send mod embeds about each case update.
+#[shuttle_service::main]
+async fn serenity(
+    #[shuttle_secrets::Secrets] secret_store: SecretStore,
+) -> shuttle_service::ShuttleSerenity {
+    // Get the discord token set in `Secrets.toml`
     env::set_var("RUST_LOG", "grimgar");
     pretty_env_logger::init();
     dotenv::dotenv().ok();
     log::info!("Starting Client.");
 
-    let _initialize_query =
-        sqlx::query(&std::fs::read_to_string("tables.sql").expect("could not open file"))
-            .execute(&mut pool().await?.acquire().await?)
-            .await?
-            .last_insert_rowid();
-
-    let token = env::var("TOKEN").expect("Couldnt get Token.");
+    let token = secret_store.get("DISCORD_TOKEN").unwrap();
     let intents = GatewayIntents::all();
-    let mut client = Client::builder(token, intents)
-        .event_handler(Handler)
+    let bot = Bot {
+        database: SqlitePool::connect("sqlite:main.sqlite").await.unwrap(),
+        guild_id: secret_store.get("GUILD_ID").unwrap(),
+    };
+    let client = Client::builder(&token, intents)
+        .event_handler(bot)
         .await
-        .expect("Error creating client");
+        .expect("Err creating client");
 
-    if let Err(why) = client.start().await {
-        log::error!("An error occurred while running the client: {:?}", why);
-    }
-    Ok(())
+    Ok(client)
 }

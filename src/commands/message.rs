@@ -1,3 +1,6 @@
+use serenity::builder::CreateApplicationCommand;
+use serenity::model::prelude::command::CommandOptionType;
+use serenity::model::Permissions;
 use serenity::{
     model::{
         application::interaction::{
@@ -9,7 +12,30 @@ use serenity::{
     prelude::Context,
     utils::Colour,
 };
-pub async fn message(ctx: &Context, command: &ApplicationCommandInteraction) { // refractor to use dashboard
+
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command
+        .name("message")
+        .description("Send a moderator message.")
+        .default_member_permissions(Permissions::MANAGE_GUILD)
+        .create_option(|channel| {
+            channel
+                .name("channel")
+                .description("Channel to send message in")
+                .kind(CommandOptionType::Channel)
+                .required(true)
+        })
+        .create_option(|message| {
+            message
+                .name("message")
+                .description("message to send")
+                .kind(CommandOptionType::String)
+                .required(true)
+        })
+}
+
+pub async fn message(ctx: &Context, command: &ApplicationCommandInteraction) {
+    // refractor to use dashboard
     let channel = command
         .data
         .options

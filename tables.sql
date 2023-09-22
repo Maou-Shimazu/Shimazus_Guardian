@@ -11,3 +11,7 @@ CREATE TABLE IF NOT EXISTS muted (
     roles   TEXT    NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS tickets (
+    id            INTEGER PRIMARY KEY NOT NULL,
+    userid        INTEGER             NOT NULl
+);
