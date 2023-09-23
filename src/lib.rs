@@ -29,6 +29,7 @@ mod core;
 mod tickets;
 use crate::commands::*;
 
+#[allow(dead_code)]
 struct Bot {
     database: SqlitePool,
     guild_id: String,
